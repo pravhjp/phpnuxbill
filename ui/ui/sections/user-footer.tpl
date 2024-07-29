@@ -3,6 +3,8 @@
         {if isset($_c['CompanyFooter'])}
             <footer class="main-footer">
                 {$_c['CompanyFooter']}
+                <br>
+                Regd Office: 1234 Company Address, City, Country
                 <div class="pull-right">
                     <a href="javascript:showPrivacy()">Privacy</a>
                     &bull;
@@ -14,6 +16,8 @@
                 PHPNuxBill by <a href="https://github.com/hotspotbilling/phpnuxbill" rel="nofollow noreferrer noopener"
                     target="_blank">iBNuX</a>, Theme by <a href="https://adminlte.io/" rel="nofollow noreferrer noopener"
                     target="_blank">AdminLTE</a>
+                 <br>
+                 Regd Office: 1234 Company Address, City, Country
                 <div class="pull-right">
                     <a href="javascript:showPrivacy()">Privacy</a>
                     &bull;
