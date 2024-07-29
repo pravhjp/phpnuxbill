@@ -8,10 +8,23 @@
 session_start();
 include "config.php";
 
+if($db_password != null && ($db_pass == null || empty($db_pass))){
+    // compability for old version
+    $db_pass = $db_password;
+}
+
 if (empty($update_url)) {
     $update_url = 'https://github.com/hotspotbilling/phpnuxbill/archive/refs/heads/master.zip';
 }
 
+if(isset($_REQUEST['update_url']) && !empty($_REQUEST['update_url'])){
+    $update_url = $_REQUEST['update_url'];
+    $_SESSION['update_url'] = $update_url;
+}
+
+if(isset($_SESSION['update_url']) && !empty($_SESSION['update_url']) && $_SESSION['update_url'] != $update_url){
+    $update_url = $_SESSION['update_url'];
+}
 
 if (!isset($_SESSION['aid']) || empty($_SESSION['aid'])) {
     r2("./?_route=login&You_are_not_admin", 'e', 'You are not admin');
@@ -92,11 +105,10 @@ if (empty($step)) {
     }
 } else if ($step == 4) {
     if (file_exists("system/updates.json")) {
-        require 'config.php';
         $db = new pdo(
             "mysql:host=$db_host;dbname=$db_name",
             $db_user,
-            $db_password,
+            $db_pass,
             array(PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION)
         );
 

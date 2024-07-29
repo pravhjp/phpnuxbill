@@ -2,6 +2,88 @@
 
 # CHANGELOG
 
+## 2024.7.23
+
+- add Voucher Used Date
+- Reports page just 1 for all
+- fix start date at dashboard
+- fix installation parameter
+
+## 2024.7.23
+
+- Add Additional Bill Info to Customer
+- Add Voucher only Login, without username
+- Add Additional Bill info to Mikrotik Comment
+- Add dynamic Application URL For Installation
+- Fix Active Customers for Voucher
+
+## 2024.7.15
+
+- Radius Rest API
+- Getting Started Documentation
+- Only Show new update just once
+
+## 2024.6.21
+
+- Add filter result in voucher and internet plan
+- Add input script on-login and on-logout
+- Add local ip for pppoe
+
+## 2024.6.19
+
+- new system for device, it can support non mikrotik devices, as long someone create device file
+- add local ip in the pool
+- Custom Fix Expired Date for postpaid
+- Expired customer can move to another Internet Plan
+- Plugin installer
+- refresh plugin manager cache
+- Docker File by George Njeri (@Swagfin)
+
+## 2024.5.21
+
+- Add Maintenance Mode by @freeispradius
+- Add Tax System by @freeispradius
+- Add Export Customer List to CSV with Filter
+- Fix some Radius Variable by @freeispradius
+- Add Rollback update
+
+## 2024.5.17
+
+- Status Customer: Active/Banned/Disabled
+- Add search with order in Customer list
+
+## 2024.5.16
+
+- Confirm can change Using
+
+## 2024.5.14
+
+- Show Plan and Location on expired list
+- Customizeable payment for recharge
+
+## 2024.5.8
+
+- Fix bugs burst by @Gerandonk
+- Fix sync for burst by @Gerandonk
+
+## 2024.5.7
+
+- Fix time for period Days
+- Fix Free radius attributes by @agstrxyz
+- Add Numeric Voucher Code by @pro-cms
+
+## 2024.4.30
+
+- CRITICAL UPDATE: last update Logic recharge not check is status on or off, it make expired customer stay in expired pool
+- Prevent double submit for recharge balance
+
+## 2024.4.29
+
+- Maps Pagination
+- Maps Search
+- Fix extend logic
+- Fix logic customer recharge to not delete when customer not change the plan
+
 ## 2024.4.23
 
 - Fix Pagination Voucher

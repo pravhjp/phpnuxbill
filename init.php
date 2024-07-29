@@ -11,7 +11,7 @@ if (realpath(__FILE__) == realpath($_SERVER['SCRIPT_FILENAME'])) {
     die();
 }
 $root_path = realpath(dirname(__FILE__)) . DIRECTORY_SEPARATOR;
-if(!isset($isApi)){
+if (!isset($isApi)) {
     $isApi = false;
 }
 // on some server, it getting error because of slash is backwards
@@ -50,6 +50,7 @@ if (!file_exists($root_path .  File::pathFixer('system/orm.php'))) {
     die($root_path . "orm.php file not found");
 }
 
+$DEVICE_PATH = $root_path . File::pathFixer('system/devices');
 $UPLOAD_PATH = $root_path . File::pathFixer('system/uploads');
 $CACHE_PATH = $root_path . File::pathFixer('system/cache');
 $PAGES_PATH = $root_path . File::pathFixer('pages');
@@ -66,16 +67,24 @@ require_once $root_path . File::pathFixer('system/orm.php');
 require_once $root_path . File::pathFixer('system/autoload/PEAR2/Autoload.php');
 include $root_path . File::pathFixer('system/autoload/Hookers.php');
 
+if($db_password != null && ($db_pass == null || empty($db_pass))){
+    // compability for old version
+    $db_pass = $db_password;
+}
+if($db_pass != null){
+    // compability for old version
+    $db_password = $db_pass;
+}
 ORM::configure("mysql:host=$db_host;dbname=$db_name");
 ORM::configure('username', $db_user);
-ORM::configure('password', $db_password);
+ORM::configure('password', $db_pass);
 ORM::configure('return_result_sets', true);
 if ($_app_stage != 'Live') {
     ORM::configure('logging', true);
 }
-if($isApi){
+if ($isApi) {
     define('U', APP_URL . '/system/api.php?r=');
-}else{
+} else {
     define('U', APP_URL . '/index.php?_route=');
 }
 
@@ -110,6 +119,10 @@ if (empty($http_proxy) && !empty($config['http_proxy'])) {
 date_default_timezone_set($config['timezone']);
 
 if ((!empty($radius_user) && $config['radius_enable']) || _post('radius_enable')) {
+    if(!empty($radius_password)){
+        // compability for old version
+        $radius_pass = $radius_password;
+    }
     ORM::configure("mysql:host=$radius_host;dbname=$radius_name", null, 'radius');
     ORM::configure('username', $radius_user, 'radius');
     ORM::configure('password', $radius_pass, 'radius');
@@ -233,6 +246,32 @@ function showResult($success, $message = '', $result = [], $meta = [])
     die();
 }
 
+
+function generateUniqueNumericVouchers($totalVouchers, $length = 8)
+{
+    // Define characters allowed in the voucher code
+    $characters = '0123456789';
+    $charactersLength = strlen($characters);
+    $vouchers = array();
+
+    // Attempt to generate unique voucher codes
+    for ($j = 0; $j < $totalVouchers; $j++) {
+        do {
+            $voucherCode = '';
+            // Generate the voucher code
+            for ($i = 0; $i < $length; $i++) {
+                $voucherCode .= $characters[rand(0, $charactersLength - 1)];
+            }
+            // Check if the generated voucher code already exists in the array
+            $isUnique = !in_array($voucherCode, $vouchers);
+        } while (!$isUnique);
+
+        $vouchers[] = $voucherCode;
+    }
+
+    return $vouchers;
+}
+
 function sendTelegram($txt)
 {
     Message::sendTelegram($txt);
@@ -253,7 +292,7 @@ function r2($to, $ntype = 'e', $msg = '')
     global $isApi;
     if ($isApi) {
         showResult(
-            ($ntype=='s')? true : false,
+            ($ntype == 's') ? true : false,
             $msg
         );
     }
@@ -294,5 +333,18 @@ function _alert($text, $type = 'success', $url = "home", $time = 3)
 
 
 if (!isset($api_secret)) {
-    $api_secret = $db_password;
+    $api_secret = $db_pass;
+}
+
+function displayMaintenanceMessage(): void
+{
+    global $config, $ui;
+    $date = $config['maintenance_date'];
+    if ($date){
+        $ui->assign('date', $date);
+    }
+    http_response_code(503);
+    $ui->assign('companyName', $config['CompanyName']);
+    $ui->display('maintenance.tpl');
+    die();
 }

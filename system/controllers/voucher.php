@@ -17,6 +17,7 @@ switch ($action) {
 
     case 'activation':
         run_hook('view_activate_voucher'); #HOOK
+        $ui->assign('code', alphanumeric(_get('code'),"-"));
         $ui->display('user-activation.tpl');
         break;
 
@@ -27,6 +28,7 @@ switch ($action) {
         if ($v1) {
             if (Package::rechargeUser($user['id'], $v1['routers'], $v1['id_plan'], "Voucher", $code)) {
                 $v1->status = "1";
+                $v1->used_date = date('Y-m-d H:i:s');
                 $v1->user = $user['username'];
                 $v1->save();
                 r2(U . "voucher/list-activated", 's', Lang::T('Activation Vouchers Successfully'));
