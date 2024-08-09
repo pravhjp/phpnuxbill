@@ -196,6 +196,11 @@ class User
         return $d;
     }
 
+    public static function isUserVoucher($kode) {
+        $regex = '/^GC\d+C.{10}$/';
+        return preg_match($regex, $kode);
+    }
+
     public static function _billing($id = 0)
     {
         if (!$id) {
@@ -205,13 +210,14 @@ class User
             ->select('tbl_user_recharges.id', 'id')
             ->selects([
                 'customer_id', 'username', 'plan_id', 'namebp', 'recharged_on', 'recharged_time', 'expiration', 'time',
-                'status', 'method', 'plan_type',
+                'status', 'method', 'plan_type', 'name_bw',
                 ['tbl_user_recharges.routers', 'routers'],
                 ['tbl_user_recharges.type', 'type'],
                 'admin_id', 'prepaid'
             ])
             ->where('customer_id', $id)
             ->left_outer_join('tbl_plans', array('tbl_plans.id', '=', 'tbl_user_recharges.plan_id'))
+            ->left_outer_join('tbl_bandwidth', array('tbl_bandwidth.id', '=', 'tbl_plans.id_bw'))
             ->find_many();
         return $d;
     }

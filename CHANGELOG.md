@@ -2,6 +2,31 @@
 
 # CHANGELOG
 
+## 2024.8.6
+
+- Fix QRCode Scanner
+- Simplify Chap verification password
+- Quota based Freeradius Rest
+- Fix Payment Gateway Audit
+
+## 2024.8.6
+
+- Fix Customer pppoe username
+
+## 2024.8.5
+
+- Add Customer Mail Inbox
+- Add pppoe customer and pppoe IP to make static username and IP
+- Add Sync button
+- Allow Mac Address Username
+- Router Maps
+
+## 2024.8.1
+
+- Show Bandwidth Plan in the customer dashboard
+- Add Audit Payment Gateway
+- Fix Plugin Manager
+
 ## 2024.7.23
 
 - add Voucher Used Date

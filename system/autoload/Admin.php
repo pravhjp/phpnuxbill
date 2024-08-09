@@ -13,7 +13,13 @@ class Admin
     {
         global $db_pass, $config;
         $enable_session_timeout = $config['enable_session_timeout'];
-        $session_timeout_duration = $config['session_timeout_duration'] * 60; // Convert minutes to seconds
+        if ($enable_session_timeout) {
+            $timeout = 60;
+            if ($config['session_timeout_duration']) {
+                $timeout = intval($config['session_timeout_duration']);
+            }
+            $session_timeout_duration = $timeout * 60; // Convert minutes to seconds
+        }
 
         if (isset($_SESSION['aid']) && isset($_SESSION['aid_expiration']) && $_SESSION['aid_expiration'] > time()) {
             return $_SESSION['aid'];
@@ -45,13 +51,17 @@ class Admin
     {
         global $db_pass, $config;
         $enable_session_timeout = $config['enable_session_timeout'];
-        $session_timeout_duration = $config['session_timeout_duration'] * 60; // Convert minutes to seconds
         if (isset($aid)) {
             $time = time();
             $token = $aid . '.' . $time . '.' . sha1($aid . '.' . $time . '.' . $db_pass);
             setcookie('aid', $token, time() + 86400 * 7);
             $_SESSION['aid'] = $aid;
             if ($enable_session_timeout) {
+                $timeout = 60;
+                if ($config['session_timeout_duration']) {
+                    $timeout = intval($config['session_timeout_duration']);
+                }
+                $session_timeout_duration = $timeout * 60; // Convert minutes to seconds
                 $_SESSION['aid_expiration'] = $time + $session_timeout_duration;
             }
             return $token;

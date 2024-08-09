@@ -29,29 +29,41 @@ class MikrotikPppoe
 
     function add_customer($customer, $plan)
     {
+        global $isChangePlan;
         $mikrotik = $this->info($plan['routers']);
         $client = $this->getClient($mikrotik['ip_address'], $mikrotik['username'], $mikrotik['password']);
-        //check if customer exists
-        $printRequest = new RouterOS\Request('/ppp/secret/print');
-        $printRequest->setQuery(RouterOS\Query::where('name', $customer['username']));
-        $cid = $client->sendSync($printRequest)->getProperty('.id');
+        $cid = self::getIdByCustomer($customer, $client);
         if (empty($cid)) {
             //customer not exists, add it
             $this->addPpoeUser($client, $plan, $customer);
         }else{
-            if (!empty($customer['pppoe_password'])) {
-                $pass = $customer['pppoe_password'];
-            } else {
-                $pass = $customer['password'];
-            }
             $setRequest = new RouterOS\Request('/ppp/secret/set');
             $setRequest->setArgument('numbers', $cid);
+            if (!empty($customer['pppoe_password'])) {
+                $setRequest->setArgument('password', $customer['pppoe_password']);
+            } else {
+                $setRequest->setArgument('password', $customer['password']);
+            }
+            if (!empty($customer['pppoe_username'])) {
+                $setRequest->setArgument('name', $customer['pppoe_username']);
+            } else {
+                $setRequest->setArgument('name', $customer['username']);
+            }
+            if (!empty($customer['pppoe_ip'])) {
+                $setRequest->setArgument('local-address', $customer['pppoe_ip']);
+            }else{
+                $setRequest->setArgument('local-address', null);
+            }
             $setRequest->setArgument('profile', $plan['name_plan']);
             $setRequest->setArgument('comment', $customer['fullname'] . ' | ' . $customer['email'] . ' | ' . implode(', ', User::getBillNames($customer['id'])));
-            $setRequest->setArgument('password', $pass);
             $client->sendSync($setRequest);
             //disconnect then
-            //$this->removePpoeActive($client, $customer['username']);
+            if(isset($isChangePlan) && $isChangePlan){
+                $this->removePpoeActive($client, $customer['username']);
+                if (!empty($customer['pppoe_username'])) {
+                    $this->removePpoeActive($client, $customer['pppoe_username']);
+                }
+            }
         }
     }
 
@@ -61,11 +73,19 @@ class MikrotikPppoe
         $client = $this->getClient($mikrotik['ip_address'], $mikrotik['username'], $mikrotik['password']);
         if (!empty($plan['plan_expired'])) {
             $p = ORM::for_table("tbl_plans")->find_one($plan['plan_expired']);
-            $this->add_customer($customer, $p);
-        } else {
-            $this->removePpoeUser($client, $customer['username']);
+            if($p){
+                $this->add_customer($customer, $p);
+                return;
+            }
+        }
+        $this->removePpoeUser($client, $customer['username']);
+        if (!empty($customer['pppoe_username'])) {
+            $this->removePpoeUser($client, $customer['pppoe_username']);
         }
         $this->removePpoeActive($client, $customer['username']);
+        if (!empty($customer['pppoe_username'])) {
+            $this->removePpoeActive($client, $customer['pppoe_username']);
+        }
     }
 
     // customer change username
@@ -118,6 +138,23 @@ class MikrotikPppoe
                 ->setArgument('remote-address', $pool['pool_name'])
                 ->setArgument('rate-limit', $rate)
         );
+    }
+
+    /**
+     * Function to ID by username from Mikrotik
+     */
+    function getIdByCustomer($customer, $client){
+        $printRequest = new RouterOS\Request('/ppp/secret/print');
+        $printRequest->setQuery(RouterOS\Query::where('name', $customer['username']));
+        $id = $client->sendSync($printRequest)->getProperty('.id');
+        if(empty($id)){
+            if (!empty($customer['pppoe_username'])) {
+                $printRequest = new RouterOS\Request('/ppp/secret/print');
+                $printRequest->setQuery(RouterOS\Query::where('name', $customer['pppoe_username']));
+                $id = $client->sendSync($printRequest)->getProperty('.id');
+            }
+        }
+        return $id;
     }
 
     function update_plan($old_name, $new_plan)
@@ -282,51 +319,23 @@ class MikrotikPppoe
 
     function addPpoeUser($client, $plan, $customer)
     {
-        global $_app_stage;
-        $addRequest = new RouterOS\Request('/ppp/secret/add');
+        $setRequest = new RouterOS\Request('/ppp/secret/add');
+        $setRequest->setArgument('service', 'pppoe');
+        $setRequest->setArgument('profile', $plan['name_plan']);
+        $setRequest->setArgument('comment', $customer['fullname'] . ' | ' . $customer['email'] . ' | ' . implode(', ', User::getBillNames($customer['id'])));
         if (!empty($customer['pppoe_password'])) {
-            $pass = $customer['pppoe_password'];
+            $setRequest->setArgument('password', $customer['pppoe_password']);
         } else {
-            $pass = $customer['password'];
+            $setRequest->setArgument('password', $customer['password']);
         }
-        $client->sendSync(
-            $addRequest
-                ->setArgument('name', $customer['username'])
-                ->setArgument('service', 'pppoe')
-                ->setArgument('profile', $plan['name_plan'])
-                ->setArgument('comment', $customer['fullname'] . ' | ' . $customer['email'] . ' | ' . implode(', ', User::getBillNames($customer['id'])))
-                ->setArgument('password', $pass)
-        );
-    }
-
-    function setPpoeUser($client, $user, $pass)
-    {
-        global $_app_stage;
-        $printRequest = new RouterOS\Request('/ppp/secret/print');
-        $printRequest->setArgument('.proplist', '.id');
-        $printRequest->setQuery(RouterOS\Query::where('name', $user));
-        $id = $client->sendSync($printRequest)->getProperty('.id');
-
-        $setRequest = new RouterOS\Request('/ppp/secret/set');
-        $setRequest->setArgument('numbers', $id);
-        $setRequest->setArgument('password', $pass);
-        $client->sendSync($setRequest);
-    }
-
-    function setPpoeUserPlan($client, $user, $plan)
-    {
-        global $_app_stage;
-        if ($_app_stage == 'demo') {
-            return null;
+        if (!empty($customer['pppoe_username'])) {
+            $setRequest->setArgument('name', $customer['pppoe_username']);
+        } else {
+            $setRequest->setArgument('name', $customer['username']);
         }
-        $printRequest = new RouterOS\Request('/ppp/secret/print');
-        $printRequest->setArgument('.proplist', '.id');
-        $printRequest->setQuery(RouterOS\Query::where('name', $user));
-        $id = $client->sendSync($printRequest)->getProperty('.id');
-
-        $setRequest = new RouterOS\Request('/ppp/secret/set');
-        $setRequest->setArgument('numbers', $id);
-        $setRequest->setArgument('profile', $plan);
+        if (!empty($customer['pppoe_ip'])) {
+            $setRequest->setArgument('local-address', $customer['pppoe_ip']);
+        }
         $client->sendSync($setRequest);
     }
 

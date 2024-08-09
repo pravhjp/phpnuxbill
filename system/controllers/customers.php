@@ -360,10 +360,12 @@ switch ($action) {
         break;
 
     case 'add-post':
-        $username = alphanumeric(_post('username'), "+_.@-");
+        $username = alphanumeric(_post('username'), ":+_.@-");
         $fullname = _post('fullname');
         $password = trim(_post('password'));
+        $pppoe_username = trim(_post('pppoe_username'));
         $pppoe_password = trim(_post('pppoe_password'));
+        $pppoe_ip = trim(_post('pppoe_ip'));
         $email = _post('email');
         $address = _post('address');
         $phonenumber = _post('phonenumber');
@@ -399,7 +401,9 @@ switch ($action) {
             $d = ORM::for_table('tbl_customers')->create();
             $d->username = $username;
             $d->password = $password;
+            $d->pppoe_username = $pppoe_username;
             $d->pppoe_password = $pppoe_password;
+            $d->pppoe_ip = $pppoe_ip;
             $d->email = $email;
             $d->account_type = $account_type;
             $d->fullname = $fullname;
@@ -432,6 +436,47 @@ switch ($action) {
                     }
                 }
             }
+
+            // Send welcome message
+            if (isset($_POST['send_welcome_message']) && $_POST['send_welcome_message'] == true) {
+                $welcomeMessage = Lang::getNotifText('welcome_message');
+                $welcomeMessage = str_replace('[[company_name]]', $config['CompanyName'], $welcomeMessage);
+                $welcomeMessage = str_replace('[[name]]', $d['fullname'], $welcomeMessage);
+                $welcomeMessage = str_replace('[[username]]', $d['username'], $welcomeMessage);
+                $welcomeMessage = str_replace('[[password]]', $d['password'], $welcomeMessage);
+                $welcomeMessage = str_replace('[[url]]', APP_URL . '/index.php?_route=login', $welcomeMessage);
+
+                $emailSubject = "Welcome to " . $config['CompanyName'];
+
+                $channels = [
+                    'sms' => [
+                        'enabled' => isset($_POST['sms']),
+                        'method' => 'sendSMS',
+                        'args' => [$d['phonenumber'], $welcomeMessage]
+                    ],
+                    'whatsapp' => [
+                        'enabled' => isset($_POST['wa']) && $_POST['wa'] == 'wa',
+                        'method' => 'sendWhatsapp',
+                        'args' => [$d['phonenumber'], $welcomeMessage]
+                    ],
+                    'email' => [
+                        'enabled' => isset($_POST['email']),
+                        'method' => 'Message::sendEmail',
+                        'args' => [$d['email'], $emailSubject, $welcomeMessage, $d['email']]
+                    ]
+                ];
+
+                foreach ($channels as $channel => $message) {
+                    if ($message['enabled']) {
+                        try {
+                            call_user_func_array($message['method'], $message['args']);
+                        } catch (Exception $e) {
+                            // Log the error and handle the failure
+                            _log("Failed to send welcome message via $channel: " . $e->getMessage());
+                        }
+                    }
+                }
+            }
             r2(U . 'customers/list', 's', Lang::T('Account Created Successfully'));
         } else {
             r2(U . 'customers/add', 'e', $msg);
@@ -439,11 +484,13 @@ switch ($action) {
         break;
 
     case 'edit-post':
-        $username = alphanumeric(_post('username'), "+_.@-");
+        $username = alphanumeric(_post('username'), ":+_.@-");
         $fullname = _post('fullname');
         $account_type = _post('account_type');
         $password = trim(_post('password'));
+        $pppoe_username = trim(_post('pppoe_username'));
         $pppoe_password = trim(_post('pppoe_password'));
+        $pppoe_ip = trim(_post('pppoe_ip'));
         $email = _post('email');
         $address = _post('address');
         $phonenumber = Lang::phoneFormat(_post('phonenumber'));
@@ -477,20 +524,37 @@ switch ($action) {
             ->find_many();
 
         $oldusername = $c['username'];
-        $oldPppoePassword = $c['password'];
-        $oldPassPassword = $c['pppoe_password'];
+        $oldPppoeUsername = $c['pppoe_username'];
+        $oldPppoePassword = $c['pppoe_password'];
+        $oldPppoeIp = $c['pppoe_ip'];
+        $oldPassPassword = $c['password'];
         $userDiff = false;
         $pppoeDiff = false;
         $passDiff = false;
+        $pppoeIpDiff = false;
         if ($oldusername != $username) {
-            $cx = ORM::for_table('tbl_customers')->where('username', $username)->find_one();
-            if ($cx) {
-                $msg .= Lang::T('Account already exist') . '<br>';
+            if (ORM::for_table('tbl_customers')->where('username', $username)->find_one()) {
+                $msg .= Lang::T('Username already used by another customer') . '<br>';
+            }
+            if(ORM::for_table('tbl_customers')->where('pppoe_username', $username)->find_one()){
+                $msg.= Lang::T('Username already used by another customer') . '<br>';
             }
             $userDiff = true;
         }
-        if ($oldPppoePassword != $pppoe_password) {
+        if ($oldPppoeUsername != $pppoe_username) {
+            if(!empty($pppoe_username)){
+                if(ORM::for_table('tbl_customers')->where('pppoe_username', $pppoe_username)->find_one()){
+                    $msg.= Lang::T('PPPoE Username already used by another customer') . '<br>';
+                }
+                if(ORM::for_table('tbl_customers')->where('username', $pppoe_username)->find_one()){
+                    $msg.= Lang::T('PPPoE Username already used by another customer') . '<br>';
+                }
+            }
             $pppoeDiff = true;
+        }
+
+        if ($oldPppoeIp != $pppoe_ip) {
+            $pppoeIpDiff = true;
         }
         if ($password != '' && $oldPassPassword != $password) {
             $passDiff = true;
@@ -503,7 +567,9 @@ switch ($action) {
             if ($password != '') {
                 $c->password = $password;
             }
+            $c->pppoe_username = $pppoe_username;
             $c->pppoe_password = $pppoe_password;
+            $c->pppoe_ip = $pppoe_ip;
             $c->fullname = $fullname;
             $c->email = $email;
             $c->account_type = $account_type;
@@ -564,11 +630,9 @@ switch ($action) {
                 }
             }
 
-            if ($userDiff || $pppoeDiff || $passDiff) {
+            if ($userDiff || $pppoeDiff || $pppoeIpDiff || $passDiff) {
                 $turs = ORM::for_table('tbl_user_recharges')->where('customer_id', $c['id'])->findMany();
                 foreach ($turs as $tur) {
-                    $tur->username = $username;
-                    $tur->save();
                     $p = ORM::for_table('tbl_plans')->find_one($tur['plan_id']);
                     $dvc = Package::getDevice($p);
                     if ($_app_stage != 'demo') {
@@ -579,12 +643,26 @@ switch ($action) {
                                 if ($userDiff) {
                                     (new $p['device'])->change_username($p, $oldusername, $username);
                                 }
+                                if ($pppoeDiff && $tur['type'] == 'PPPOE') {
+                                    if(empty($oldPppoeUsername) && !empty($pppoe_username)){
+                                        // admin just add pppoe username
+                                        (new $p['device'])->change_username($p, $username, $pppoe_username);
+                                    }else if(empty($pppoe_username) && !empty($oldPppoeUsername)){
+                                        // admin want to use customer username
+                                        (new $p['device'])->change_username($p, $oldPppoeUsername, $username);
+                                    }else{
+                                        // regular change pppoe username
+                                        (new $p['device'])->change_username($p, $oldPppoeUsername, $pppoe_username);
+                                    }
+                                }
                                 (new $p['device'])->add_customer($c, $p);
                             } else {
                                 new Exception(Lang::T("Devices Not Found"));
                             }
                         }
                     }
+                    $tur->username = $username;
+                    $tur->save();
                 }
             }
             r2(U . 'customers/view/' . $id, 's', 'User Updated Successfully');
@@ -606,6 +684,8 @@ switch ($action) {
             'status' => 7
         ];
 
+        $append_url = "&order=" . urlencode($order) . "&filter=" . urlencode($filter) . "&orderby=" . urlencode($orderby);
+
         if ($search != '') {
             $query = ORM::for_table('tbl_customers')
                 ->whereRaw("username LIKE '%$search%' OR fullname LIKE '%$search%' OR address LIKE '%$search%' " .
@@ -619,8 +699,8 @@ switch ($action) {
         } else {
             $query->order_by_desc($order);
         }
-        $d = $query->findMany();
         if (_post('export', '') == 'csv') {
+            $d = $query->findMany();
             $h = false;
             set_time_limit(-1);
             header('Pragma: public');
@@ -661,7 +741,7 @@ switch ($action) {
             fclose($fp);
             die();
         }
-        $ui->assign('xheader', '<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.11.3/css/jquery.dataTables.min.css">');
+        $d = Paginator::findMany($query, ['search' => $search], 30, $append_url);
         $ui->assign('d', $d);
         $ui->assign('statuses', ORM::for_table('tbl_customers')->getEnum("status"));
         $ui->assign('filter', $filter);

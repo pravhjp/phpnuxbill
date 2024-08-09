@@ -103,7 +103,7 @@ switch ($action) {
             r2(U . "order/package", 'w', Lang::T("Payment not found"));
         }
         // jika url kosong, balikin ke buy, kecuali cancel
-        if (empty($trx['pg_url_payment']) && $routes['3'] != 'cancel') {
+        if ($trx['status'] == 1 && empty($trx['pg_url_payment']) && $routes['3'] != 'cancel') {
             r2(U . "order/buy/" . (($trx['routers_id'] == 0) ? $trx['routers'] : $trx['routers_id']) . '/' . $trx['plan_id'], 'w', Lang::T("Checking payment"));
         }
         if ($routes['3'] == 'check') {
@@ -345,7 +345,11 @@ switch ($action) {
             $tax_rate = $tax_rate_setting;
         }
         $plan = ORM::for_table('tbl_plans')->find_one($routes['3']);
-        $tax = Package::tax($plan['price'], $tax_rate);
+        $add_cost = 0;
+        if ($router['name'] != 'balance') {
+            list($bills, $add_cost) = User::getBills($id_customer);
+        }
+        $tax = Package::tax($plan['price'] + $add_cost, $tax_rate);
         $pgs = array_values(explode(',', $config['payment_gateway']));
         if (count($pgs) == 0) {
             sendTelegram("Payment Gateway not set, please set it in Settings");
@@ -359,6 +363,8 @@ switch ($action) {
             }
             $ui->assign('route2', $routes[2]);
             $ui->assign('route3', $routes[3]);
+            $ui->assign('add_cost', $add_cost);
+            $ui->assign('bills', $bills);
             $ui->assign('plan', $plan);
             $ui->display('user-selectGateway.tpl');
             break;
@@ -454,7 +460,6 @@ switch ($action) {
             } else {
                 $d->price = ($plan['price'] + $add_cost + $tax);
             }
-            //$d->price = ($plan['price'] + $add_cost);
             $d->created_date = date('Y-m-d H:i:s');
             $d->status = 1;
             $d->save();
